@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>米游社收藏夹 · AI 知识库</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css?v=9"/>
+  <script src="/static/marked.min.js"></script>
+  <script>
+    (function() {
+      try {
+        const c = JSON.parse(localStorage.getItem('mys_credentials'));
+        if (c && c.stuid && c.stoken) {
+          document.addEventListener('DOMContentLoaded', function() {
+            userCookie = c;
+            var uidEl = document.getElementById('sidebar-uid');
+            if (uidEl) uidEl.textContent = c.stuid || '—';
+            var su = document.getElementById('sidebar-user');
+            if (su) su.classList.add('show');
+            var sb = document.getElementById('sidebar-bottom');
+            if (sb) sb.classList.add('show');
+            var sg = document.getElementById('stat-grid');
+            if (sg) sg.classList.add('show');
+            var st = document.getElementById('sidebar-status');
+            if (st) st.style.display = 'none';
+            loadRoles().then(function() { loadFavourites(); });
+            loadRAGStats();
+          });
+        } else {
+          document.addEventListener('DOMContentLoaded', function() {
+            openLoginModal();
+          });
+        }
+      } catch(e) {
+        document.addEventListener('DOMContentLoaded', function() {
+          openLoginModal();
+        });
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<!-- 登录弹窗遮罩 -->
+<div id="login-modal-overlay" class="modal-overlay"></div>
+
+<!-- 登录弹窗 -->
+<div id="login-modal" class="login-modal">
+  <div class="modal-content">
+    
+    <div class="modal-body-horizontal">
+      <!-- 左侧：说明和步骤 -->
+      <div class="modal-left">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px;margin-bottom:8px">👋</div>
+          <h2>扫码登录</h2>
+          <p>使用 App 扫描二维码</p>
+        </div>
+
+        <div class="steps-vertical">
+          <div class="step-v">
+            <div class="step-v-num">1</div>
+            <div class="step-v-text">
+              <div class="step-v-title">自动生成二维码</div>
+              <div class="step-v-desc">页面加载时自动生成</div>
+            </div>
+          </div>
+          <div class="step-v-connector"></div>
+          <div class="step-v">
+            <div class="step-v-num">2</div>
+            <div class="step-v-text">
+              <div class="step-v-title">App 扫码确认</div>
+              <div class="step-v-desc">在米游社 App 内确认</div>
+            </div>
+          </div>
+          <div class="step-v-connector"></div>
+          <div class="step-v">
+            <div class="step-v-num">3</div>
+            <div class="step-v-text">
+              <div class="step-v-title">进入应用</div>
+              <div class="step-v-desc">自动跳转到主页面</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer-left">
+          <div class="qr-hint-left" id="qr-hint-left" style="font-size:12px;color:var(--mu);text-align:center">二维码已生成</div>
+        </div>
+      </div>
+
+      <!-- 右侧：二维码 -->
+      <div class="modal-right">
+        <div class="qr-wrap" id="qr-wrap">
+          <img id="qr-img" src="" alt="二维码" style="display:none"/>
+          <div class="qr-ph" id="qr-ph">
+            <div class="qr-ph-icon">⬜</div>
+            <span style="font-size:12px">点击生成</span>
+          </div>
+          <div class="qr-mask" id="qr-loading">
+            <div class="spinner"></div>
+            <span style="font-size:12px">生成中...</span>
+          </div>
+          <div class="qr-mask ok" id="qr-confirmed">
+            <span style="font-size:28px">✓</span>
+            <span style="font-size:12px">成功</span>
+          </div>
+        </div>
+        <div class="qr-state-pill" id="qr-state-pill">准备中</div>
+        <div class="qr-hint" id="qr-hint"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 入库范围选择弹窗 -->
+<div id="ingest-scope-overlay" class="modal-overlay"></div>
+<div id="ingest-scope-modal" class="login-modal ingest-scope-modal">
+  <div class="modal-content ingest-scope-content">
+    <div class="ingest-scope-title">选择入库范围</div>
+    <div class="ingest-scope-subtitle">增量入库，自动去重，不会覆盖历史数据</div>
+    <div class="ingest-scope-options">
+      <button class="ingest-scope-option" id="ingest-opt-current" onclick="selectIngestScope('current')">当前分区</button>
+      <button class="ingest-scope-option" id="ingest-opt-all" onclick="selectIngestScope('all')">全部分区</button>
+    </div>
+    <div class="ingest-scope-actions">
+      <button class="btn-outline ingest-cancel" onclick="closeIngestScopeModal()">取消</button>
+      <button class="btn-primary ingest-confirm" id="ingest-scope-confirm" onclick="confirmIngestScope()">开始入库</button>
+    </div>
+  </div>
+</div>
+
+<!-- 左侧导航栏 -->
+<div id="sidebar">
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <img src="https://bbs-static.miyoushe.com/communityweb/upload/6d7c2aab3ecf5932985e3aa5ccd7c0d7.png?x-oss-process=image/resize,s_400,l_16000/auto-orient,0/interlace,1/quality,q_70/format,webp" alt="logo"/>
+    <span class="sidebar-logo-text"><b>米游社</b> AI 收藏</span>
+  </div>
+
+  <!-- 登录状态 -->
+  <div class="sidebar-status" id="sidebar-status">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">未登录</span>
+  </div>
+
+  <!-- 用户信息 -->
+  <div class="sidebar-user" id="sidebar-user">
+    <div class="sidebar-account-row">
+      <div class="sidebar-uid-label">当前账号</div>
+      <div class="sidebar-uid" id="sidebar-uid">—</div>
+    </div>
+    <button class="sidebar-logout-btn" onclick="logout()">退出登录</button>
+  </div>
+
+  <!-- 导航菜单 -->
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">功能</div>
+    <button class="nav-btn active" id="nav-posts" onclick="switchView('posts', this)">
+      <span class="nav-icon">📚</span>
+      <span>我的收藏夹</span>
+    </button>
+    <button class="nav-btn" id="nav-rag" onclick="switchView('rag', this)">
+      <span class="nav-icon">🤖</span>
+      <span>知识库问答</span>
+    </button>
+  </nav>
+
+  <!-- 归档按钮 -->
+  <div class="sidebar-bottom" id="sidebar-bottom">
+    <div class="ingest-status" id="ingest-status"></div>
+    <button class="ingest-btn" id="btn-ingest" onclick="openIngestScopeModal()">
+      <span>⬆</span> <span>归档收藏帖</span>
+    </button>
+  </div>
+
+  <!-- 统计 -->
+  <div class="stat-grid" id="stat-grid">
+    <div class="stat-cell"><div class="slabel">帖子</div><div class="sval" id="stat-posts">—</div></div>
+    <div class="stat-cell"><div class="slabel">文档块</div><div class="sval" id="stat-docs">—</div></div>
+    <div class="stat-cell"><div class="slabel">图片块</div><div class="sval" id="stat-image">—</div></div>
+    <div class="stat-cell"><div class="slabel">音频块</div><div class="sval" id="stat-audio">—</div></div>
+  </div>
+</div>
+
+<!-- 右侧主内容区 -->
+<div id="main-content">
+
+  <!-- 登录后主区块（默认显示） -->
+  <div id="posts-section" style="display:flex;flex:1;flex-direction:column;overflow:hidden;min-height:0">
+
+    <!-- 收藏夹视图 -->
+    <div id="tab-posts" class="active">
+      <div class="content-header">
+        <div class="content-title">
+          <span class="content-title-icon">📚</span>
+          我的收藏夹
+        </div>
+        <span class="count-badge" id="count-badge">加载中...</span>
+      </div>
+      <div class="game-tabs" id="game-tabs"></div>
+      <div class="posts-list" id="posts-list">
+        <div class="state-box"><div class="spinner"></div><p>加载中...</p></div>
+      </div>
+    </div>
+
+    <!-- 知识库问答视图 -->
+    <div id="tab-rag">
+      <div class="chat-panel">
+      <div class="chat-header">
+        <span class="chat-dot"></span>
+        <span style="font-weight:600">知识库问答</span>
+        <span style="font-size:12px;color:var(--mu);margin-left:4px">· 基于收藏帖内容</span>
+        <button onclick="clearChat()"
+          style="margin-left:auto;font-size:12px;background:transparent;border:1px solid var(--bd);color:var(--mu);padding:4px 10px;border-radius:6px;cursor:pointer">
+          清空对话
+        </button>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-empty" id="chat-empty">
+          <div class="chat-empty-icon">🤖</div>
+          <span>归档收藏帖后，在此提问</span>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <textarea class="chat-input" id="chat-input" rows="1"
+          placeholder="输入问题，按 Enter 发送，Shift+Enter 换行..."></textarea>
+        <button class="chat-send-btn" id="btn-send" onclick="sendChat()" title="发送">↑</button>
+      </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/static/app.js?v=16"></script>
+<script>
+// 左右布局的视图切换（替代原来的 tab 切换）
+function switchView(view, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('tab-posts').classList.remove('active');
+  document.getElementById('tab-rag').classList.remove('active');
+  document.getElementById('tab-' + view).classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual env
+.venv/
+venv/
+
+# Environment
+.env
+
+# Local data / artifacts
+data/chroma/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Cursor local settings/cache
+.cursor/
