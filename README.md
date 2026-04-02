@@ -30,8 +30,19 @@
 
 ```text
 MYS_RagAgent/
-├─ main.py                 # FastAPI 入口与 API 路由
+├─ main.py                 # 启动入口（仅创建 app）
 ├─ requirements.txt        # Python 依赖
+├─ server/                 # 后端应用层
+│  ├─ app.py               # FastAPI app factory
+│  ├─ models.py            # 请求模型
+│  ├─ routers/             # 按领域拆分路由
+│  │  ├─ common.py
+│  │  ├─ login.py
+│  │  ├─ mys_api.py
+│  │  └─ rag.py
+│  └─ services/            # 外部 API/任务状态服务
+│     ├─ ingest_state.py
+│     └─ mys_api.py
 ├─ static/                 # 前端页面与样式脚本
 │  ├─ index.html
 │  ├─ style.css
