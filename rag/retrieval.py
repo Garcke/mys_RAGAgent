@@ -70,7 +70,7 @@ def parse_query(question: str) -> dict:
 只返回 JSON，不要任何解释。"""
 
     try:
-        resp = MultiModalConversation.call(
+        resp = Generation.call(
             model=QUERY_PARSER_MODEL,
             messages=[
                 {"role": "system", "content": system},

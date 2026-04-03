@@ -37,5 +37,6 @@ RolesByStoken_data.json
 userFavourite_data.json
 
 # Do not publish local conversation / design docs
-vibeCodeing-1.md
+vibeCoding-1.md
+vibeCoding-2.md
 米游社收藏夹多模态 RAG 知识库 Agent 设计文档 (单 ChromaDB 版).md
