@@ -8,15 +8,15 @@ from collections import defaultdict
 
 from dotenv import load_dotenv
 import dashscope
-from dashscope import TextEmbedding, Generation
+from dashscope import TextEmbedding, Generation,MultiModalConversation
 
 from . import chroma
 
 load_dotenv()
 dashscope.api_key = os.getenv("DASHSCOPE_API_KEY", "")
 
-QUERY_PARSER_MODEL = os.getenv("QUERY_PARSER_MODEL", "qwen-max")
-ANSWER_MODEL = os.getenv("ANSWER_MODEL", "qwen-max")
+QUERY_PARSER_MODEL = os.getenv("QUERY_PARSER_MODEL", "qwen3.5-flash")
+ANSWER_MODEL = os.getenv("ANSWER_MODEL", "qwen3.5-flash")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
 
 # game_id 映射（用于 Query Parser 实体识别）
@@ -70,7 +70,7 @@ def parse_query(question: str) -> dict:
 只返回 JSON，不要任何解释。"""
 
     try:
-        resp = Generation.call(
+        resp = MultiModalConversation.call(
             model=QUERY_PARSER_MODEL,
             messages=[
                 {"role": "system", "content": system},
