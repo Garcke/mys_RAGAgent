@@ -255,6 +255,7 @@ function showPosts() {
   const sg = $('stat-grid'); if (sg) sg.classList.add('show');
   const st = $('sidebar-status'); if (st) st.style.display = 'none';
   loadFavourites();
+  loadRAGStats();
 }
 
 // ── 收藏帖 ──────────────────────────────────────────────────
@@ -310,22 +311,9 @@ let allItems = [];       // 全量收藏数据缓存
 let activeGameId = 0;    // 0 = 全部
 let ingestScopeChoice = null;
 let ingestPendingGameIds = new Set();
-let ingestedGames = loadIngestedGames();
+let ingestedGameIds = new Set(); // 后端真实入库状态
+let ingestedPostCountsByGame = {}; // 后端真实入库帖子数
 let ingestProgressPoll = null;
-
-function loadIngestedGames() {
-  try {
-    const raw = localStorage.getItem('mys_ingested_games');
-    const data = raw ? JSON.parse(raw) : {};
-    return data && typeof data === 'object' ? data : {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveIngestedGames() {
-  try { localStorage.setItem('mys_ingested_games', JSON.stringify(ingestedGames)); } catch (e) {}
-}
 
 function getCurrentGameLabel() {
   if (activeGameId === 0) return '全部分区';
@@ -396,10 +384,11 @@ function buildGameTabs(items) {
 function makeTabBtn(gid, label, count) {
   const isActive = activeGameId === gid;
   const pending = ingestPendingGameIds.has(gid);
-  const ingested = !!ingestedGames[String(gid)];
+  const ingested = ingestedGameIds.has(gid);
+  const ingestedCount = Number(ingestedPostCountsByGame[String(gid)] || 0);
   const statusBadge = pending
     ? `<span class="game-ingest-badge pending">入库中...</span>`
-    : (ingested ? `<span class="game-ingest-badge done">已入库</span>` : '');
+    : (ingested ? `<span class="game-ingest-badge done">已入库 ${ingestedCount}</span>` : '');
   return `<button class="game-tab-btn${isActive ? ' active' : ''}" onclick="filterGame(${gid})">${label}<span class="game-tab-count">${count}</span>${statusBadge}</button>`;
 }
 
@@ -637,19 +626,12 @@ async function ingestFavourites(scope = 'current') {
         try {
           await pollOnce();
           if (finalData) {
-            targetGameIds.forEach(gid => {
-              ingestedGames[String(gid)] = {
-                ingested: true,
-                at: Date.now()
-              };
-              ingestPendingGameIds.delete(gid);
-            });
-            saveIngestedGames();
+            targetGameIds.forEach(gid => ingestPendingGameIds.delete(gid));
             buildGameTabs(allItems);
 
             statusEl.innerHTML = `<span class="ingest-status-success">✓ ${finalData.message || '归档完成'}</span>`;
             toast(finalData.message || '归档完成');
-            setTimeout(loadRAGStats, 800);
+            await loadRAGStats();
             btn.disabled = false;
           }
         } catch (pollErr) {
@@ -664,19 +646,12 @@ async function ingestFavourites(scope = 'current') {
       return;
     }
 
-    targetGameIds.forEach(gid => {
-      ingestedGames[String(gid)] = {
-        ingested: true,
-        at: Date.now()
-      };
-      ingestPendingGameIds.delete(gid);
-    });
-    saveIngestedGames();
+    targetGameIds.forEach(gid => ingestPendingGameIds.delete(gid));
     buildGameTabs(allItems);
 
     statusEl.innerHTML = `<span class="ingest-status-success">✓ ${finalData.message || '归档完成'}</span>`;
     toast(finalData.message || '归档完成');
-    setTimeout(loadRAGStats, 800);
+    await loadRAGStats();
   } catch (e) {
     stopIngestProgressPoll();
     targetGameIds.forEach(gid => ingestPendingGameIds.delete(gid));
@@ -701,6 +676,14 @@ async function loadRAGStats() {
     if (vectorsEl) vectorsEl.textContent = data.vectors ?? '0';
     $('stat-image').textContent = byType['image'] ?? '0';
     $('stat-audio').textContent = byType['audio'] ?? '0';
+
+    const ids = Array.isArray(data.ingested_game_ids) ? data.ingested_game_ids : [];
+    ingestedGameIds = new Set(ids.map(x => Number(x)).filter(x => Number.isInteger(x) && x > 0));
+
+    const counts = data.ingested_post_counts_by_game;
+    ingestedPostCountsByGame = (counts && typeof counts === 'object') ? counts : {};
+
+    buildGameTabs(allItems);
   } catch (e) { }
 }
 

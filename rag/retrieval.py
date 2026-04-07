@@ -15,8 +15,8 @@ from . import chroma
 load_dotenv()
 dashscope.api_key = os.getenv("DASHSCOPE_API_KEY", "")
 
-QUERY_PARSER_MODEL = os.getenv("QUERY_PARSER_MODEL", "qwen3.5-flash")
-ANSWER_MODEL = os.getenv("ANSWER_MODEL", "qwen3.5-flash")
+QUERY_PARSER_MODEL = os.getenv("QUERY_PARSER_MODEL", "qwen-max")
+ANSWER_MODEL = os.getenv("ANSWER_MODEL", "qwen-max")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
 
 # game_id 映射（用于 Query Parser 实体识别）
@@ -29,6 +29,21 @@ GAME_NAMES = {
     "星穹铁道": 6, "崩坏星穹铁道": 6, "崩坏：星穹铁道": 6,
     "绝区零": 8, "zzz": 8,
 }
+
+
+def _content_to_text(content) -> str:
+    """兼容 DashScope message.content 可能是字符串或分段数组。"""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                text = block.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(parts)
+    return ""
 
 
 def is_chitchat_query(question: str) -> bool:
@@ -70,7 +85,7 @@ def parse_query(question: str) -> dict:
 只返回 JSON，不要任何解释。"""
 
     try:
-        resp = Generation.call(
+        resp = MultiModalConversation.call(
             model=QUERY_PARSER_MODEL,
             messages=[
                 {"role": "system", "content": system},
@@ -80,7 +95,7 @@ def parse_query(question: str) -> dict:
         )
         if resp.status_code != 200:
             raise RuntimeError(resp.message)
-        raw = resp.output.choices[0]["message"]["content"].strip()
+        raw = _content_to_text(resp.output.choices[0]["message"]["content"]).strip()
         # 去掉可能的 markdown 代码块
         raw = raw.strip("`").lstrip("json").strip()
         parsed = json.loads(raw)
@@ -235,14 +250,14 @@ def generate_answer(question: str, context: str, sources: list) -> tuple:
         {"role": "system", "content": system_prompt},
         {"role": "user",   "content": f"知识卡片：\n\n{context}\n\n用户问题：{question}"},
     ]
-    resp = Generation.call(
+    resp = MultiModalConversation.call(
         model=ANSWER_MODEL,
         messages=messages,
         result_format="message",
     )
     if resp.status_code != 200:
         raise RuntimeError(f"LLM 失败: {resp.message}")
-    answer = resp.output.choices[0]["message"]["content"]
+    answer = _content_to_text(resp.output.choices[0]["message"]["content"])
 
     # 只保留 answer 中实际提到了 post_title 或 summary 的来源
     used_sources = []

@@ -199,6 +199,8 @@ async def rag_stats():
             "docs": stats["docs"],
             "vectors": stats["vectors"],
             "by_type": stats["by_type"],
+            "ingested_game_ids": stats.get("ingested_game_ids", []),
+            "ingested_post_counts_by_game": stats.get("ingested_post_counts_by_game", {}),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

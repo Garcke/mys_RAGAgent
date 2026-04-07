@@ -68,7 +68,7 @@ def get_count() -> int:
 
 
 def get_stats() -> dict:
-    """统计各 modality 数量"""
+    """统计各 modality 数量 + 按 game_id 的真实入库状态"""
     col = _get_collection()
     total = col.count()
     # 按 modality 分组统计
@@ -80,20 +80,60 @@ def get_stats() -> dict:
                 by_modality[mod] = len(r["ids"])
             except Exception:
                 pass
-    # 统计唯一 post 数
+
+    # 统计唯一 post 数 + 每个 game 的唯一 post 数
     posts = 0
+    ingested_game_ids = []
+    ingested_post_counts_by_game = {}
+
     if total > 0:
         try:
             all_meta = col.get(include=["metadatas"])
-            post_ids = {m.get("post_id") for m in all_meta["metadatas"] if m.get("post_id")}
+            metadatas = all_meta.get("metadatas") or []
+
+            post_ids = {
+                m.get("post_id")
+                for m in metadatas
+                if isinstance(m, dict) and m.get("post_id")
+            }
             posts = len(post_ids)
+
+            game_posts = {}
+            for m in metadatas:
+                if not isinstance(m, dict):
+                    continue
+
+                gid = m.get("game_id")
+                if isinstance(gid, int) and gid > 0:
+                    game_id = gid
+                elif isinstance(gid, str) and gid.isdigit() and int(gid) > 0:
+                    game_id = int(gid)
+                else:
+                    continue
+
+                post_id = m.get("post_id")
+                if not post_id:
+                    continue
+
+                if game_id not in game_posts:
+                    game_posts[game_id] = set()
+                game_posts[game_id].add(str(post_id))
+
+            ingested_game_ids = sorted(game_posts.keys())
+            ingested_post_counts_by_game = {
+                str(gid): len(post_set)
+                for gid, post_set in game_posts.items()
+            }
         except Exception:
             pass
+
     return {
-        "posts":   posts,
+        "posts": posts,
         "vectors": total,
-        "docs":    total,
+        "docs": total,
         "by_type": by_modality,
+        "ingested_game_ids": ingested_game_ids,
+        "ingested_post_counts_by_game": ingested_post_counts_by_game,
     }
 
 
