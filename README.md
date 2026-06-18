@@ -1,4 +1,4 @@
-# 米游社收藏夹 AI 知识库（MYS_RagAgent）
+# 米游社收藏夹 AI 知识库（mys_RAGAgent）
 
 一个基于 **FastAPI + ChromaDB + DashScope(Qwen)** 的米游社收藏夹知识库应用：
 
